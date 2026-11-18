@@ -5,6 +5,7 @@ package sh.adelessfox.procmem;
 
 import sh.adelessfox.procmem.struct.StructBuilder0;
 
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -18,19 +19,26 @@ import java.util.function.Function;
  * @see #of(Function, long, long, String)
  * @see #struct(String)
  */
-public interface Type<T> {
+@SuppressWarnings("StaticInitializerReferencesSubClass")
+public abstract class Type<T> {
     /** A sized type that represents a single byte. */
-    Sized<Byte> BYTE = of(Pointer::readByte, Byte.BYTES, Byte.BYTES, "byte");
+    public static final Sized<Byte> BYTE = of(Pointer::readByte, Byte.BYTES, Byte.BYTES, "byte");
     /** A sized type that represents a single short. */
-    Sized<Short> SHORT = of(Pointer::readShort, Short.BYTES, Short.BYTES, "short");
+    public static final Sized<Short> SHORT = of(Pointer::readShort, Short.BYTES, Short.BYTES, "short");
     /** A sized type that represents a single int. */
-    Sized<Integer> INT = of(Pointer::readInt, Integer.BYTES, Integer.BYTES, "int");
+    public static final Sized<Integer> INT = of(Pointer::readInt, Integer.BYTES, Integer.BYTES, "int");
     /** A sized type that represents a single long. */
-    Sized<Long> LONG = of(Pointer::readLong, Long.BYTES, Long.BYTES, "long");
+    public static final Sized<Long> LONG = of(Pointer::readLong, Long.BYTES, Long.BYTES, "long");
     /** A sized type that represents a single float. */
-    Sized<Float> FLOAT = of(Pointer::readFloat, Float.BYTES, Float.BYTES, "float");
+    public static final Sized<Float> FLOAT = of(Pointer::readFloat, Float.BYTES, Float.BYTES, "float");
     /** A sized type that represents a single double. */
-    Sized<Double> DOUBLE = of(Pointer::readDouble, Double.BYTES, Double.BYTES, "double");
+    public static final Sized<Double> DOUBLE = of(Pointer::readDouble, Double.BYTES, Double.BYTES, "double");
+
+    /** A sized type that represents {@code const char *}. */
+    public static final Type.Sized<Optional<String>> C_STRING =
+        Type.of(Pointer::readCString, "CString")
+            .nullable()
+            .indirect();
 
     /**
      * Creates a new {@link Sized sized type} with the given reader, size, alignment, and name.
@@ -42,7 +50,7 @@ public interface Type<T> {
      * @param <T>       the type of value
      * @return a new {@link Sized} type
      */
-    static <T> Sized<T> of(Function<Pointer, T> reader, long size, long alignment, String name) {
+    public static <T> Sized<T> of(Function<Pointer, T> reader, long size, long alignment, String name) {
         if (size <= 0) {
             throw new IllegalArgumentException("size must be greater than 0");
         }
@@ -82,7 +90,7 @@ public interface Type<T> {
      * @param <T>       the type of value
      * @return a new {@link Sized} type
      */
-    static <T> Sized<T> of(Function<Pointer, T> reader, long size, long alignment) {
+    public static <T> Sized<T> of(Function<Pointer, T> reader, long size, long alignment) {
         return of(reader, size, alignment, "[" + size + " bytes]");
     }
 
@@ -94,7 +102,7 @@ public interface Type<T> {
      * @param <T>    the type of value
      * @return a new {@link Type} type
      */
-    static <T> Type<T> of(Function<Pointer, T> reader, String name) {
+    public static <T> Type<T> of(Function<Pointer, T> reader, String name) {
         return new Type<>() {
             @Override
             public T read(Pointer pointer) {
@@ -131,7 +139,7 @@ public interface Type<T> {
      * @param name the name of the struct type
      * @return a new {@link StructBuilder0} to build the struct type
      */
-    static StructBuilder0 struct(String name) {
+    public static StructBuilder0 struct(String name) {
         return StructBuilder0.create(name);
     }
 
@@ -141,7 +149,7 @@ public interface Type<T> {
      * @param pointer the pointer to read from
      * @return the value read from the pointer
      */
-    T read(Pointer pointer);
+    public abstract T read(Pointer pointer);
 
     /**
      * Creates a new {@link Ref reference} to the value at the given {@link Pointer}.
@@ -149,7 +157,7 @@ public interface Type<T> {
      * @param pointer the pointer to the value
      * @return a new reference to the value at the pointer
      */
-    default Ref<T> at(Pointer pointer) {
+    public Ref<T> at(Pointer pointer) {
         return new Ref<>(this, pointer);
     }
 
@@ -158,7 +166,7 @@ public interface Type<T> {
      *
      * @return a new sized type that represents a reference to the value of this type
      */
-    default Sized<Ref<T>> ref() {
+    public Sized<Ref<T>> ref() {
         return new Sized<>() {
             @Override
             public Ref<T> read(Pointer pointer) {
@@ -177,19 +185,35 @@ public interface Type<T> {
         };
     }
 
+    public <R> Type<R> map(Function<? super T, ? extends R> mapper) {
+        return Type.of(p -> mapper.apply(read(p)), toString());
+    }
+
+    public Type<Optional<T>> nullable() {
+        return Type.of(p -> p.isNotNull() ? Optional.of(read(p)) : Optional.empty(), this + "?");
+    }
+
+    public Type<Ref<T>> deferred() {
+        return Type.of(this::at, toString());
+    }
+
+    public Sized<T> indirect() {
+        return ref().map(Ref::read);
+    }
+
     /**
      * A sized type that has a known size and alignment.
      *
      * @param <T> the type of value
      */
-    interface Sized<T> extends Type<T> {
+    public abstract static class Sized<T> extends Type<T> {
         /**
          * Returns the {@link TypeLayout layout} of this type for the given {@link MemoryLayout target layout}.
          *
          * @param target the memory layout to get the layout for
          * @return the layout of this type for the given memory layout
          */
-        TypeLayout layout(MemoryLayout target);
+        public abstract TypeLayout layout(MemoryLayout target);
 
         /**
          * Creates a new {@link Slice slice} of the given length at the given {@link Pointer}.
@@ -198,8 +222,42 @@ public interface Type<T> {
          * @param length  the length of the slice
          * @return a new slice of the given length at the given pointer
          */
-        default Slice<T> slice(Pointer pointer, int length) {
+        public Slice<T> slice(Pointer pointer, int length) {
             return new Slice<>(this, pointer, length);
+        }
+
+        @Override
+        public <R> Sized<R> map(Function<? super T, ? extends R> mapper) {
+            return sized(super.map(mapper), this::layout);
+        }
+
+        @Override
+        public Sized<Optional<T>> nullable() {
+            return sized(super.nullable(), this::layout);
+        }
+
+        @Override
+        public Sized<Ref<T>> deferred() {
+            return sized(super.deferred(), this::layout);
+        }
+
+        private static <T> Sized<T> sized(Type<T> delegate, Function<MemoryLayout, TypeLayout> layout) {
+            return new Sized<>() {
+                @Override
+                public T read(Pointer pointer) {
+                    return delegate.read(pointer);
+                }
+
+                @Override
+                public TypeLayout layout(MemoryLayout target) {
+                    return layout.apply(target);
+                }
+
+                @Override
+                public String toString() {
+                    return delegate.toString();
+                }
+            };
         }
     }
 }

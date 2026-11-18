@@ -4,6 +4,7 @@
 package sh.adelessfox.procmem.process;
 
 import sh.adelessfox.procmem.Memory;
+import sh.adelessfox.procmem.MemoryLayout;
 import sh.adelessfox.procmem.util.Platform;
 
 import java.nio.file.Path;
@@ -19,9 +20,18 @@ import java.util.OptionalLong;
  *
  * @see Memory
  */
-public abstract sealed class Process
-    implements Memory, AutoCloseable
+public abstract sealed class Process extends Memory
+    implements AutoCloseable
     permits Win32Process, LinuxProcess {
+
+    final long pid;
+    final MemoryLayout layout;
+
+    Process(long pid, MemoryLayout layout) {
+        super(0);
+        this.pid = pid;
+        this.layout = layout;
+    }
 
     /**
      * Attempts to open a new process for its module name.
@@ -69,4 +79,9 @@ public abstract sealed class Process
      */
     @Override
     public abstract void close();
+
+    @Override
+    public String toString() {
+        return "Process[pid=%d, layout=%s]".formatted(pid, layout);
+    }
 }

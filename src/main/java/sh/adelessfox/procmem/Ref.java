@@ -23,6 +23,13 @@ public record Ref<T>(Type<T> type, Pointer pointer) {
         return type.read(pointer);
     }
 
+    public Slice<T> slice(int length) {
+        if (!(type instanceof Type.Sized<T> sized)) {
+            throw new IllegalArgumentException("Type must be sized to create a slice");
+        }
+        return new Slice<>(sized, pointer, length);
+    }
+
     @Override
     public String toString() {
         return type + " @ " + pointer;

@@ -20,31 +20,29 @@ import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
 import static java.lang.foreign.ValueLayout.*;
 
 final class Win32Process extends Process {
-    private final int pid;
     private final MemorySegment handle;
-    private final MemoryLayout layout;
 
-    private Win32Process(int pid, MemorySegment handle, MemoryLayout layout) {
-        this.pid = pid;
+    private Win32Process(long pid, MemorySegment handle, MemoryLayout layout) {
+        super(pid, layout);
         this.handle = handle;
-        this.layout = layout;
     }
 
     static Win32Process open(long pid) {
-        int intPid = Math.toIntExact(pid);
         var handle = Kernel32.openProcess(
             Kernel32.PROCESS_VM_READ | Kernel32.PROCESS_QUERY_LIMITED_INFORMATION,
             false,
-            intPid);
+            Math.toIntExact(pid));
         if (handle.address() == 0L) {
             throw new IllegalStateException("Failed to open process");
         }
-        return new Win32Process(intPid, handle, processLayout(handle));
+        return new Win32Process(pid, handle, processLayout(handle));
     }
 
     @Override
     public List<Module> modules() {
-        var snapshot = Kernel32.createToolhelp32Snapshot(Kernel32.TH32CS_SNAPMODULE | Kernel32.TH32CS_SNAPMODULE32, pid);
+        var snapshot = Kernel32.createToolhelp32Snapshot(
+            Kernel32.TH32CS_SNAPMODULE | Kernel32.TH32CS_SNAPMODULE32,
+            Math.toIntExact(pid));
         var modules = new ArrayList<Module>();
         try (var arena = Arena.ofConfined()) {
             var entry = Kernel32.MODULEENTRY32W.allocate(arena);

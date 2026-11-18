@@ -142,9 +142,17 @@ public record Pointer(Memory memory, long address) implements Comparable<Pointer
         return new Pointer(memory, address + byteOffset);
     }
 
+    public boolean isNull() {
+        return address == 0;
+    }
+
+    public boolean isNotNull() {
+        return !isNull();
+    }
+
     @Override
     public String toString() {
-        return "%#x".formatted(address);
+        return "%#x".formatted(memory.address() + address);
     }
 
     @Override

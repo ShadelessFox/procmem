@@ -59,6 +59,11 @@ public record Slice<T>(Type.Sized<T> type, Pointer pointer, int length) implemen
         return IntStream.range(0, length).mapToObj(this::read);
     }
 
+    public Slice<T> subSlice(int start, int end) {
+        Objects.checkFromToIndex(start, end, length);
+        return new Slice<>(type, pointer.add(Math.multiplyExact(start, stride())), end - start);
+    }
+
     @Override
     public Iterator<T> iterator() {
         return stream().iterator();

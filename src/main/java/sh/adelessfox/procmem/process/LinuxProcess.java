@@ -16,14 +16,11 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 final class LinuxProcess extends Process {
-    private final long pid;
     private final FileChannel memory;
-    private final MemoryLayout layout;
 
     private LinuxProcess(long pid, FileChannel memory, MemoryLayout layout) {
-        this.pid = pid;
+        super(pid, layout);
         this.memory = memory;
-        this.layout = layout;
     }
 
     static LinuxProcess open(long pid) {

@@ -45,12 +45,8 @@ record StructDefinition(List<StructMember> members) {
     }
 
     <T> Type.Sized<T> build(String name, BiFunction<Pointer, StructLayout, T> reader) {
-        return new Type.Sized<>() {
-            private final ConcurrentHashMap<MemoryLayout, StructLayout> layouts = new ConcurrentHashMap<>();
-
-            private StructLayout resolve(MemoryLayout target) {
-                return layouts.computeIfAbsent(target, StructDefinition.this::resolve);
-            }
+        return new Type.Sized<T>() {
+            final ConcurrentHashMap<MemoryLayout, StructLayout> layouts = new ConcurrentHashMap<>();
 
             @Override
             public TypeLayout layout(MemoryLayout target) {
@@ -65,6 +61,10 @@ record StructDefinition(List<StructMember> members) {
             @Override
             public String toString() {
                 return name;
+            }
+
+            StructLayout resolve(MemoryLayout target) {
+                return layouts.computeIfAbsent(target, StructDefinition.this::resolve);
             }
         };
     }
