@@ -247,6 +247,21 @@ public abstract class Type<T> {
             return new Slice<>(this, pointer, length);
         }
 
+        public Sized<Slice<T>> slice(int length) {
+            return new Sized<>() {
+                @Override
+                public TypeLayout layout(MemoryLayout target) {
+                    var elementLayout = Sized.this.layout(target);
+                    return new TypeLayout(Math.multiplyExact(elementLayout.size(), length), elementLayout.alignment());
+                }
+
+                @Override
+                public Slice<T> read(Pointer pointer) {
+                    return Sized.this.slice(pointer, length);
+                }
+            };
+        }
+
         @Override
         public <R> Sized<R> map(Function<? super T, ? extends R> mapper) {
             return sized(super.map(mapper), this::layout);
