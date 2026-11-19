@@ -34,6 +34,27 @@ public abstract class Type<T> {
     /** A sized type that represents a single double. */
     public static final Sized<Double> DOUBLE = of(Pointer::readDouble, Double.BYTES, Double.BYTES, "double");
 
+    /** A sized type that represents a raw pointer. */
+    public static final Sized<Pointer> POINTER = new Sized<>() {
+        @Override
+        public Pointer read(Pointer pointer) {
+            return pointer.deref();
+        }
+
+        @Override
+        public TypeLayout layout(MemoryLayout memoryLayout) {
+            return new TypeLayout(
+                memoryLayout.pointerSize(),
+                memoryLayout.pointerSize()
+            );
+        }
+
+        @Override
+        public String toString() {
+            return "pointer";
+        }
+    };
+
     /** A sized type that represents {@code const char *}. */
     public static final Type.Sized<Optional<String>> C_STRING =
         Type.of(Pointer::readCString, "CString")
