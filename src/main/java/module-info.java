@@ -5,7 +5,8 @@
  * This module provides facilities for reading and writing process memory.
  */
 module sh.adelessfox.procmem {
-    requires static org.jetbrains.annotations;
+    requires static org.jetbrains.annotations; // Required for org.jetbrains.annotations.Debug.Renderer
+    requires static java.compiler; // Required for sh.adelessfox.procmem.struct.GenerateStructBuilders
 
     exports sh.adelessfox.procmem.process;
     exports sh.adelessfox.procmem.struct;
