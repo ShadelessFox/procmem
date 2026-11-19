@@ -201,7 +201,7 @@ public abstract class Type<T> {
 
             @Override
             public String toString() {
-                return Type.this + "*";
+                return "Ref<" + Type.this + ">";
             }
         };
     }
@@ -211,7 +211,7 @@ public abstract class Type<T> {
     }
 
     public Type<Optional<T>> nullable() {
-        return Type.of(p -> p.isNotNull() ? Optional.of(read(p)) : Optional.empty(), this + "?");
+        return Type.of(p -> p.isNotNull() ? Optional.of(read(p)) : Optional.empty(), "Nullable<" + this + ">");
     }
 
     public Type<Ref<T>> deferred() {
