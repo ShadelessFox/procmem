@@ -12,11 +12,11 @@ import java.util.Objects;
  * Operations that take multibyte values will use the byte order specified by the {@link #layout() memory layout}.
  */
 public abstract class Memory implements AutoCloseable {
-    final long address;
+    final long base;
 
-    public Memory(long address) {
-        Objects.checkIndex(address, Long.MAX_VALUE);
-        this.address = address;
+    public Memory(long base) {
+        Objects.checkIndex(base, Long.MAX_VALUE);
+        this.base = base;
     }
 
     /**
@@ -26,8 +26,13 @@ public abstract class Memory implements AutoCloseable {
      */
     public abstract MemoryLayout layout();
 
-    public final long address() {
-        return address;
+    /**
+     * Returns the base address of this memory block.
+     *
+     * @return the base address, in bytes
+     */
+    public final long base() {
+        return base;
     }
 
     /**
@@ -35,63 +40,47 @@ public abstract class Memory implements AutoCloseable {
      * <p>
      * The destination buffer's position will be advanced by the number of bytes read.
      *
-     * @param address the starting address to read from
-     * @param dst     the destination buffer to write the bytes into
+     * @param offset the offset relative to the {@link base() base} to read from
+     * @param dst    the destination buffer to write the bytes into
      */
-    public abstract void read(long address, ByteBuffer dst);
+    public abstract void read(long offset, ByteBuffer dst);
 
     /**
      * Reads a single signed byte.
      *
-     * @param offset the address to read from
+     * @param offset the offset relative to the {@link base() base} to read from
      * @return the value read from memory
      */
-    public byte readByte(long offset) {
-        var buffer = ByteBuffer.allocate(Byte.BYTES);
-        read(offset, buffer);
-        return buffer.flip().get();
-    }
+    public abstract byte readByte(long offset);
 
     /**
      * Reads a 16-bit signed integer.
      *
-     * @param offset the address to read from
+     * @param offset the offset relative to the {@link base() base} to read from
      * @return the value read from memory
      */
-    public short readShort(long offset) {
-        var buffer = ByteBuffer.allocate(Short.BYTES).order(layout().byteOrder());
-        read(offset, buffer);
-        return buffer.flip().getShort();
-    }
+    public abstract short readShort(long offset);
 
     /**
      * Reads a 32-bit signed integer.
      *
-     * @param offset the address to read from
+     * @param offset the offset relative to the {@link base() base} to read from
      * @return the value read from memory
      */
-    public int readInt(long offset) {
-        var buffer = ByteBuffer.allocate(Integer.BYTES).order(layout().byteOrder());
-        read(offset, buffer);
-        return buffer.flip().getInt();
-    }
+    public abstract int readInt(long offset);
 
     /**
      * Reads a 32-bit signed integer.
      *
-     * @param offset the address to read from
+     * @param offset the offset relative to the {@link base() base} to read from
      * @return the value read from memory
      */
-    public long readLong(long offset) {
-        var buffer = ByteBuffer.allocate(Long.BYTES).order(layout().byteOrder());
-        read(offset, buffer);
-        return buffer.flip().getLong();
-    }
+    public abstract long readLong(long offset);
 
     /**
      * Reads a 32-bit IEEE-754 single-precision float.
      *
-     * @param offset the address to read from
+     * @param offset the offset relative to the {@link base() base} to read from
      * @return the value read from memory
      */
     public final float readFloat(long offset) {
@@ -101,7 +90,7 @@ public abstract class Memory implements AutoCloseable {
     /**
      * Reads a 64-bit IEEE-754 double-precision float.
      *
-     * @param offset the address to read from
+     * @param offset the offset relative to the {@link base() base} to read from
      * @return the value read from memory
      */
     public final double readDouble(long offset) {
@@ -111,7 +100,7 @@ public abstract class Memory implements AutoCloseable {
     /**
      * Reads a pointer-sized integer.
      *
-     * @param offset the address to read from
+     * @param offset the offset relative to the {@link base() base} to read from
      * @return the value read from memory
      * @see MemoryLayout#pointerSize()
      */
@@ -128,7 +117,7 @@ public abstract class Memory implements AutoCloseable {
     /**
      * Reads a pointer from memory.
      *
-     * @param offset the address to read from
+     * @param offset the offset relative to the {@link base() base} to read from
      * @return a {@link Pointer} representing the value read from memory
      */
     public final Pointer readPointer(long offset) {
@@ -140,64 +129,48 @@ public abstract class Memory implements AutoCloseable {
      * <p>
      * The source buffer's position will be advanced by the number of bytes written.
      *
-     * @param offset the starting address to write to
-     * @param src     the source buffer containing the bytes to write
+     * @param offset the offset relative to the {@link base() base} to write to
+     * @param src    the source buffer containing the bytes to write
      */
     public abstract void write(long offset, ByteBuffer src);
 
     /**
      * Writes a single signed byte.
      *
-     * @param offset the address to write to
-     * @param value   the value to write to memory
+     * @param offset the offset relative to the {@link base() base} to write to
+     * @param value  the value to write to memory
      */
-    public void writeByte(long offset, byte value) {
-        var buffer = ByteBuffer.allocate(Byte.BYTES);
-        buffer.put(value).flip();
-        write(offset, buffer);
-    }
+    public abstract void writeByte(long offset, byte value);
 
     /**
      * Writes a 16-bit signed integer.
      *
-     * @param offset the address to write to
-     * @param value   the value to write to memory
+     * @param offset the offset relative to the {@link base() base} to write to
+     * @param value  the value to write to memory
      */
-    public void writeShort(long offset, short value) {
-        var buffer = ByteBuffer.allocate(Short.BYTES).order(layout().byteOrder());
-        buffer.putShort(value).flip();
-        write(offset, buffer);
-    }
+    public abstract void writeShort(long offset, short value);
 
     /**
      * Writes a 32-bit signed integer.
      *
-     * @param offset the address to write to
-     * @param value   the value to write to memory
+     * @param offset the offset relative to the {@link base() base} to write to
+     * @param value  the value to write to memory
      */
-    public void writeInt(long offset, int value) {
-        var buffer = ByteBuffer.allocate(Integer.BYTES).order(layout().byteOrder());
-        buffer.putInt(value).flip();
-        write(offset, buffer);
-    }
+    public abstract void writeInt(long offset, int value);
 
     /**
      * Writes a 64-bit signed integer.
      *
-     * @param offset the address to write to
-     * @param value   the value to write to memory
+     * @param offset the offset relative to the {@link base() base} to write to
+     * @param value  the value to write to memory
      */
-    public void writeLong(long offset, long value) {
-        var buffer = ByteBuffer.allocate(Long.BYTES).order(layout().byteOrder());
-        buffer.putLong(value).flip();
-        write(offset, buffer);
-    }
+    public abstract void writeLong(long offset, long value);
 
     /**
      * Writes a 32-bit IEEE-754 single-precision float.
      *
-     * @param offset the address to write to
-     * @param value   the value to write to memory
+     * @param offset the offset relative to the {@link base() base} to write to
+     * @param value  the value to write to memory
      */
     public final void writeFloat(long offset, float value) {
         writeInt(offset, Float.floatToIntBits(value));
@@ -206,8 +179,8 @@ public abstract class Memory implements AutoCloseable {
     /**
      * Writes a 64-bit IEEE-754 double-precision float.
      *
-     * @param offset the address to write to
-     * @param value   the value to write to memory
+     * @param offset the offset relative to the {@link base() base} to write to
+     * @param value  the value to write to memory
      */
     public final void writeDouble(long offset, double value) {
         writeLong(offset, Double.doubleToLongBits(value));
@@ -216,8 +189,8 @@ public abstract class Memory implements AutoCloseable {
     /**
      * Writes a pointer-sized integer.
      *
-     * @param offset the address to write to
-     * @param value   the value to write to memory
+     * @param offset the offset relative to the {@link base() base} to write to
+     * @param value  the value to write to memory
      * @see MemoryLayout#pointerSize()
      */
     public final void writeAddress(long offset, long value) {
@@ -233,7 +206,7 @@ public abstract class Memory implements AutoCloseable {
     /**
      * Writes a pointer to memory.
      *
-     * @param offset the address to write to
+     * @param offset  the offset relative to the {@link base() base} to write to
      * @param pointer the pointer to write to memory
      */
     public final void writePointer(long offset, Pointer pointer) {
@@ -246,92 +219,15 @@ public abstract class Memory implements AutoCloseable {
     /**
      * Creates a {@link Pointer} representing the specified address in this memory block.
      *
-     * @param offset the address to create a pointer for
+     * @param offset the offset relative to the {@link base() base} to create a pointer for
      * @return a {@link Pointer} representing the specified address
      */
     public Pointer pointer(long offset) {
         return new Pointer(this, offset);
     }
 
-    /**
-     * Creates a new {@link Memory} instance that represents a slice of this memory block.
-     *
-     * @param layout the memory layout of the slice
-     * @return a new {@link Memory} instance representing the specified slice
-     */
-    public Memory slice(MemoryLayout layout) {
-        return slice(0L, layout);
-    }
-
-    /**
-     * Creates a new {@link Memory} instance that represents a slice of this memory block.
-     *
-     * @param offset the starting address of the slice, in bytes
-     * @return a new {@link Memory} instance representing the specified slice
-     */
-    public Memory slice(long offset) {
-        return slice(offset, layout());
-    }
-
-    /**
-     * Creates a new {@link Memory} instance that represents a slice of this memory block.
-     *
-     * @param offset the starting address of the slice, in bytes
-     * @param layout the memory layout of the slice
-     * @return a new {@link Memory} instance representing the specified slice
-     */
-    public Memory slice(long offset, MemoryLayout layout) {
-        return slice(offset, Long.MAX_VALUE, layout);
-    }
-
-    /**
-     * Creates a new {@link Memory} instance that represents a slice of this memory block.
-     *
-     * @param offset the starting address of the slice, in bytes
-     * @param size   the size of the slice, in bytes
-     * @return a new {@link Memory} instance representing the specified slice
-     */
-    public Memory slice(long offset, long size) {
-        return slice(offset, size, layout());
-    }
-
-    /**
-     * Creates a new {@link Memory} instance that represents a slice of this memory block.
-     *
-     * @param offset the starting address of the slice, in bytes
-     * @param size   the size of the slice, in bytes
-     * @param layout the memory layout of the slice
-     * @return a new {@link Memory} instance representing the specified slice
-     */
-    public Memory slice(long offset, long size, MemoryLayout layout) {
-        Objects.checkFromIndexSize(offset, size, Long.MAX_VALUE);
-        return new Memory(address() + offset) {
-            @Override
-            public MemoryLayout layout() {
-                return layout;
-            }
-
-            @Override
-            public void read(long address, ByteBuffer dst) {
-                Objects.checkIndex(address, size);
-                Memory.this.read(offset + address, dst);
-            }
-
-            @Override
-            public void write(long address, ByteBuffer src) {
-                Objects.checkIndex(address, size);
-                Memory.this.write(offset + address, src);
-            }
-
-            @Override
-            public void close() {
-                // do nothing
-            }
-        };
-    }
-
     @Override
     public String toString() {
-        return "Memory[address=%#x, layout=%s]".formatted(address(), layout());
+        return "Memory[base=%#x, layout=%s]".formatted(base(), layout());
     }
 }

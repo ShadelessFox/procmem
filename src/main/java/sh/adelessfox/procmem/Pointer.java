@@ -91,19 +91,24 @@ public record Pointer(Memory memory, long address) implements Comparable<Pointer
         return memory.readDouble(address);
     }
 
+    public Pointer readPointer() {
+        return memory.readPointer(address);
+    }
+
     public String readString(Charset charset, int length) {
         var buffer = ByteBuffer.allocate(length);
         memory.read(address, buffer);
         return charset.decode(buffer.flip()).toString();
     }
 
-    public String readCString(int limit) {
-        var buffer = ByteBuffer.allocate(limit);
-        memory.read(address, buffer);
-        for (int i = 0; i < buffer.position(); i++) {
+    public String readCString(int capacity) {
+        var buffer = ByteBuffer.allocate(capacity).limit(1);
+        for (int i = 0; i < buffer.capacity(); i++) {
+            memory.read(address + i, buffer);
             if (buffer.get(i) == 0) {
                 return StandardCharsets.ISO_8859_1.decode(buffer.slice(0, i)).toString();
             }
+            buffer.limit(i + 2); // Increase limit to read the next byte
         }
         throw new IllegalStateException("String out of bounds");
     }
@@ -152,7 +157,7 @@ public record Pointer(Memory memory, long address) implements Comparable<Pointer
 
     @Override
     public String toString() {
-        return "%#x".formatted(memory.address() + address);
+        return "%#x".formatted(memory.base() + address);
     }
 
     @Override

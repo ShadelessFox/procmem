@@ -39,20 +39,25 @@ final class LinuxProcess extends Process {
     }
 
     @Override
+    public List<Section> sections(Module module) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public MemoryLayout layout() {
         return layout;
     }
 
     @Override
-    public void read(long address, ByteBuffer dst) {
+    public void read(long offset, ByteBuffer dst) {
         while (dst.hasRemaining()) {
             try {
-                if (memory.read(dst, address + dst.position()) <= 0) {
+                if (memory.read(dst, offset + dst.position()) <= 0) {
                     throw new EOFException("Incomplete process memory read");
                 }
             } catch (IOException e) {
                 throw new IllegalStateException(
-                    "Failed to read %d more bytes at %#x from process %d".formatted(dst.remaining(), address, pid), e);
+                    "Failed to read %d more bytes at %#x from process %d".formatted(dst.remaining(), offset, pid), e);
             }
         }
     }

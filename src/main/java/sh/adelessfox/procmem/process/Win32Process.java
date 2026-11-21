@@ -4,6 +4,7 @@
 package sh.adelessfox.procmem.process;
 
 import sh.adelessfox.procmem.MemoryLayout;
+import sh.adelessfox.procmem.Type;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
@@ -13,7 +14,9 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
@@ -50,9 +53,9 @@ final class Win32Process extends Process {
                 do {
                     var name = entry.moduleName();
                     var path = Path.of(entry.modulePath());
-                    var address = entry.baseAddr().address();
+                    var base = entry.baseAddr().address();
                     var size = entry.baseSize();
-                    modules.add(new Module(name, path, address, size));
+                    modules.add(new Module(name, path, base, size));
                 } while (Kernel32.module32NextW(snapshot, entry));
             }
         } finally {
@@ -62,21 +65,51 @@ final class Win32Process extends Process {
     }
 
     @Override
+    public List<Section> sections(Module module) {
+        var image = pointer(module.base());
+        if (Short.toUnsignedInt(image.readShort()) != 0x5a4d) {
+            throw new IllegalArgumentException("Invalid DOS signature");
+        }
+
+        var ntOffset = Integer.toUnsignedLong(image.add(0x3c).readInt());
+        var ntPointer = image.add(ntOffset);
+        var nt = NtHeaders.TYPE.read(ntPointer);
+
+        if (nt.signature() != 0x00004550) {
+            throw new IllegalArgumentException("Invalid PE signature");
+        }
+
+        var fixedHeaderSize = NtHeaders.TYPE.layout(layout()).size();
+        var table = ntPointer.add(fixedHeaderSize + nt.optionalHeaderSize());
+
+        var sections = new ArrayList<Section>();
+        for (var header : SectionHeader.TYPE.slice(table, nt.sectionCount())) {
+            var base = Math.addExact(module.base(), header.virtualAddress());
+            var size = header.virtualSize();
+            var permissions = header.mapCharacteristicsToPermissions();
+
+            sections.add(new Section(header.name(), base, size, permissions));
+        }
+
+        return List.copyOf(sections);
+    }
+
+    @Override
     public MemoryLayout layout() {
         return layout;
     }
 
     @Override
-    public void read(long address, ByteBuffer dst) {
+    public void read(long offset, ByteBuffer dst) {
         try {
             Kernel32.readProcessMemory(
                 handle,
-                MemorySegment.ofAddress(address),
+                MemorySegment.ofAddress(offset),
                 dst,
                 dst.remaining(),
                 MemorySegment.NULL);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to read %d bytes at %#x from process %d".formatted(dst.remaining(), address, pid), e);
+            throw new IllegalStateException("Failed to read %d bytes at %#x from process %d".formatted(dst.remaining(), offset, pid), e);
         }
     }
 
@@ -128,6 +161,63 @@ final class Win32Process extends Process {
         }
     }
 
+    private static final Type.Sized<Integer> WORD =
+        Type.SHORT.map(Short::toUnsignedInt);
+
+    private static final Type.Sized<Long> DWORD =
+        Type.INT.map(Integer::toUnsignedLong);
+
+    private static final Type.Sized<String> SECTION_NAME = Type.of(
+        pointer -> {
+            var name = pointer.readString(StandardCharsets.US_ASCII, 8);
+            int terminator = name.indexOf('\0');
+            return terminator < 0 ? name : name.substring(0, terminator);
+        }, 8, 1, "SectionName");
+
+    private record NtHeaders(
+        int signature,
+        int sectionCount,
+        int optionalHeaderSize
+    ) {
+        static final Type.Sized<NtHeaders> TYPE = Type.struct("NtHeaders")
+            .field("signature", Type.INT)           // 0
+            .padding(2)                            // Machine
+            .field("sectionCount", WORD)           // 6
+            .padding(12)                           // Timestamp and symbol-table fields
+            .field("optionalHeaderSize", WORD)     // 20
+            .padding(2)                            // Characteristics
+            .build(NtHeaders::new);                // Size: 24
+    }
+
+    private record SectionHeader(
+        String name,
+        long virtualSize,
+        long virtualAddress,
+        int characteristics
+    ) {
+        static final Type.Sized<SectionHeader> TYPE = Type.struct("SectionHeader")
+            .field("name", SECTION_NAME)           // 0
+            .field("virtualSize", DWORD)           // 8
+            .field("virtualAddress", DWORD)        // 12
+            .padding(20)                          // File data, relocations, line numbers
+            .field("characteristics", Type.INT)    // 36
+            .build(SectionHeader::new);            // Size: 40
+
+        private Set<Section.Permission> mapCharacteristicsToPermissions() {
+            var permissions = EnumSet.noneOf(Section.Permission.class);
+            if ((characteristics & 0x40000000) != 0) {
+                permissions.add(Section.Permission.READ);
+            }
+            if ((characteristics & 0x80000000) != 0) {
+                permissions.add(Section.Permission.WRITE);
+            }
+            if ((characteristics & 0x20000000) != 0) {
+                permissions.add(Section.Permission.EXECUTE);
+            }
+            return Set.copyOf(permissions);
+        }
+    }
+
     private static final class Kernel32 {
         // OpenProcess
         static final int PROCESS_VM_READ = 0x10;
@@ -140,6 +230,17 @@ final class Win32Process extends Process {
         static final long INVALID_HANDLE_VALUE = -1L;
         static final int TH32CS_SNAPMODULE = 0x00000008;
         static final int TH32CS_SNAPMODULE32 = 0x00000010;
+
+        // NT header stuff
+        private static final int DOS_HEADER_SIZE = 64;
+        private static final int DOS_NT_HEADERS_OFFSET = 0x3c;
+        private static final int NT_FIXED_HEADER_SIZE = 24; // Signature + COFF header.
+        private static final int NT_SECTION_COUNT_OFFSET = 6;
+        private static final int NT_OPTIONAL_HEADER_SIZE_OFFSET = 20;
+        private static final int SECTION_HEADER_SIZE = 40;
+        private static final int SECTION_NAME_SIZE = 8;
+        private static final int SECTION_VIRTUAL_SIZE_OFFSET = 8;
+        private static final int SECTION_RVA_OFFSET = 12;
 
         static final MethodHandle openProcess;
         static final MethodHandle closeHandle;
@@ -232,7 +333,13 @@ final class Win32Process extends Process {
                 result -> result != 0);
         }
 
-        static void readProcessMemory(MemorySegment process, MemorySegment address, ByteBuffer buffer, long size, MemorySegment numberOfBytesRead) {
+        static void readProcessMemory(
+            MemorySegment process,
+            MemorySegment address,
+            ByteBuffer buffer,
+            long size,
+            MemorySegment numberOfBytesRead
+        ) {
             checked(
                 "ReadProcessMemory",
                 (arena, cs) -> {
@@ -246,7 +353,13 @@ final class Win32Process extends Process {
                 result -> result != 0);
         }
 
-        static void writeProcessMemory(MemorySegment process, MemorySegment address, ByteBuffer buffer, int size, MemorySegment numberOfBytesWritten) {
+        static void writeProcessMemory(
+            MemorySegment process,
+            MemorySegment address,
+            ByteBuffer buffer,
+            int size,
+            MemorySegment numberOfBytesWritten
+        ) {
             checked(
                 "WriteProcessMemory",
                 (arena, cs) -> {
