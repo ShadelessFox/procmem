@@ -5,66 +5,66 @@ package sh.adelessfox.procmem.struct;
 
 import sh.adelessfox.procmem.Type;
 
-public final class StructBuilder10<A, B, C, D, E, F, G, H, I, J> {
-  private final String name;
+public final class StructBuilder10<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9> {
+    private final String name;
 
-  private final StructDefinition layout;
+    private final StructDefinition layout;
 
-  private final StructMember.Field<A> a;
+    private final StructMember.Field<F0> f0;
 
-  private final StructMember.Field<B> b;
+    private final StructMember.Field<F1> f1;
 
-  private final StructMember.Field<C> c;
+    private final StructMember.Field<F2> f2;
 
-  private final StructMember.Field<D> d;
+    private final StructMember.Field<F3> f3;
 
-  private final StructMember.Field<E> e;
+    private final StructMember.Field<F4> f4;
 
-  private final StructMember.Field<F> f;
+    private final StructMember.Field<F5> f5;
 
-  private final StructMember.Field<G> g;
+    private final StructMember.Field<F6> f6;
 
-  private final StructMember.Field<H> h;
+    private final StructMember.Field<F7> f7;
 
-  private final StructMember.Field<I> i;
+    private final StructMember.Field<F8> f8;
 
-  private final StructMember.Field<J> j;
+    private final StructMember.Field<F9> f9;
 
-  StructBuilder10(String name, StructDefinition layout, StructMember.Field<A> a,
-      StructMember.Field<B> b, StructMember.Field<C> c, StructMember.Field<D> d,
-      StructMember.Field<E> e, StructMember.Field<F> f, StructMember.Field<G> g,
-      StructMember.Field<H> h, StructMember.Field<I> i, StructMember.Field<J> j) {
-    this.name = name;
-    this.layout = layout;
-    this.a = a;
-    this.b = b;
-    this.c = c;
-    this.d = d;
-    this.e = e;
-    this.f = f;
-    this.g = g;
-    this.h = h;
-    this.i = i;
-    this.j = j;
-  }
+    StructBuilder10(String name, StructDefinition layout, StructMember.Field<F0> f0,
+            StructMember.Field<F1> f1, StructMember.Field<F2> f2, StructMember.Field<F3> f3,
+            StructMember.Field<F4> f4, StructMember.Field<F5> f5, StructMember.Field<F6> f6,
+            StructMember.Field<F7> f7, StructMember.Field<F8> f8, StructMember.Field<F9> f9) {
+        this.name = name;
+        this.layout = layout;
+        this.f0 = f0;
+        this.f1 = f1;
+        this.f2 = f2;
+        this.f3 = f3;
+        this.f4 = f4;
+        this.f5 = f5;
+        this.f6 = f6;
+        this.f7 = f7;
+        this.f8 = f8;
+        this.f9 = f9;
+    }
 
-  public <K> StructBuilder11<A, B, C, D, E, F, G, H, I, J, K> field(String name,
-      Type.Sized<K> type) {
-    var placement = layout.append(name, type);
-    return new StructBuilder11<A, B, C, D, E, F, G, H, I, J, K>(this.name, placement.layout(), a, b, c, d, e, f, g, h, i, j, placement.field());
-  }
+    public <F10> StructBuilder11<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10> field(String name,
+            Type.Sized<F10> type) {
+        var placement = layout.append(name, type);
+        return new StructBuilder11<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10>(this.name, placement.layout(), f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, placement.field());
+    }
 
-  public StructBuilder10<A, B, C, D, E, F, G, H, I, J> padding(long bytes) {
-    return new StructBuilder10<A, B, C, D, E, F, G, H, I, J>(this.name, layout.padding(bytes), a, b, c, d, e, f, g, h, i, j);
-  }
+    public StructBuilder10<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9> padding(long bytes) {
+        return new StructBuilder10<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9>(this.name, layout.padding(bytes), f0, f1, f2, f3, f4, f5, f6, f7, f8, f9);
+    }
 
-  public <T> Type.Sized<T> build(
-      StructBuilder10.Constructor<A, B, C, D, E, F, G, H, I, J, T> constructor) {
-    return layout.build(name, (pointer, resolved) -> constructor.create(a.read(pointer, resolved), b.read(pointer, resolved), c.read(pointer, resolved), d.read(pointer, resolved), e.read(pointer, resolved), f.read(pointer, resolved), g.read(pointer, resolved), h.read(pointer, resolved), i.read(pointer, resolved), j.read(pointer, resolved)));
-  }
+    public <T> Type.Sized<T> build(
+            StructBuilder10.Constructor<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, T> constructor) {
+        return layout.build(name, (pointer, resolved) -> constructor.create(f0.read(pointer, resolved), f1.read(pointer, resolved), f2.read(pointer, resolved), f3.read(pointer, resolved), f4.read(pointer, resolved), f5.read(pointer, resolved), f6.read(pointer, resolved), f7.read(pointer, resolved), f8.read(pointer, resolved), f9.read(pointer, resolved)));
+    }
 
-  @FunctionalInterface
-  public interface Constructor<A, B, C, D, E, F, G, H, I, J, T> {
-    T create(A a, B b, C c, D d, E e, F f, G g, H h, I i, J j);
-  }
+    @FunctionalInterface
+    public interface Constructor<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, T> {
+        T create(F0 f0, F1 f1, F2 f2, F3 f3, F4 f4, F5 f5, F6 f6, F7 f7, F8 f8, F9 f9);
+    }
 }

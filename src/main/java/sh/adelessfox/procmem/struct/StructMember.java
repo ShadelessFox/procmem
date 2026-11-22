@@ -7,12 +7,12 @@ import sh.adelessfox.procmem.Pointer;
 import sh.adelessfox.procmem.Type;
 
 sealed interface StructMember {
-    record Field<T>(int index, String name, Type.Sized<T> type) implements StructMember {
+    record Field<T>(int index, String struct, String name, Type.Sized<T> type) implements StructMember {
         T read(Pointer pointer, StructDefinition.StructLayout resolved) {
             try {
                 return type.read(pointer.add(resolved.offsets()[index]));
             } catch (Exception e) {
-                throw new IllegalStateException("Failed to read field " + name + " at index " + index, e);
+                throw new IllegalStateException("Failed to read field " + struct + '.' + name + ": " + e.getMessage(), e);
             }
         }
     }

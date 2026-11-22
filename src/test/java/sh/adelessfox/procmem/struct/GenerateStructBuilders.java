@@ -19,6 +19,7 @@ public final class GenerateStructBuilders {
 
     private static final String PACKAGE_NAME = "sh.adelessfox.procmem";
     private static final Path DIRECTORY = Path.of("src/main/java");
+    private static final String PACKAGE_NAME = "sh.adelessfox.procmem.struct";
 
     private static final ClassName TYPE_SIZED_NAME = ClassName.get(Type.Sized.class);
     private static final ClassName STRUCT_MEMBER_FIELD = ClassName.get(StructMember.Field.class);
@@ -28,6 +29,8 @@ public final class GenerateStructBuilders {
         for (int arity = 0; arity < MAX_FIELDS; arity++) {
             JavaFile
                 .builder(PACKAGE_NAME, makeBuilderImpl(arity, arity + 1 == MAX_FIELDS))
+                .indent("    ")
+                .skipJavaLangImports(true)
                 .build().writeTo(DIRECTORY);
         }
     }
@@ -53,7 +56,7 @@ public final class GenerateStructBuilders {
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(String.class, "name")
                 .returns(name)
-                .addStatement("return new $T(name, $T.empty())", name, StructDefinition.class)
+                .addStatement("return new $T(name, $T.empty(name))", name, StructDefinition.class)
                 .build());
         }
 
@@ -193,12 +196,9 @@ public final class GenerateStructBuilders {
         return arguments;
     }
 
-    private static final List<TypeVariableName> TYPE_ARGUMENTS =
-        IntStream.range(0, 27)
-            .mapToObj(i -> TypeVariableName.get(Character.toString('A' + i)))
-            .toList();
-
     private static List<TypeVariableName> makeTypeArguments(int arity) {
-        return TYPE_ARGUMENTS.subList(0, arity);
+        return IntStream.range(0, arity)
+            .mapToObj(i -> TypeVariableName.get("F" + i))
+            .toList();
     }
 }

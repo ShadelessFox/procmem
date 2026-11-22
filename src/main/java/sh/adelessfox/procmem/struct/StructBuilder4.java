@@ -5,44 +5,44 @@ package sh.adelessfox.procmem.struct;
 
 import sh.adelessfox.procmem.Type;
 
-public final class StructBuilder4<A, B, C, D> {
-  private final String name;
+public final class StructBuilder4<F0, F1, F2, F3> {
+    private final String name;
 
-  private final StructDefinition layout;
+    private final StructDefinition layout;
 
-  private final StructMember.Field<A> a;
+    private final StructMember.Field<F0> f0;
 
-  private final StructMember.Field<B> b;
+    private final StructMember.Field<F1> f1;
 
-  private final StructMember.Field<C> c;
+    private final StructMember.Field<F2> f2;
 
-  private final StructMember.Field<D> d;
+    private final StructMember.Field<F3> f3;
 
-  StructBuilder4(String name, StructDefinition layout, StructMember.Field<A> a,
-      StructMember.Field<B> b, StructMember.Field<C> c, StructMember.Field<D> d) {
-    this.name = name;
-    this.layout = layout;
-    this.a = a;
-    this.b = b;
-    this.c = c;
-    this.d = d;
-  }
+    StructBuilder4(String name, StructDefinition layout, StructMember.Field<F0> f0,
+            StructMember.Field<F1> f1, StructMember.Field<F2> f2, StructMember.Field<F3> f3) {
+        this.name = name;
+        this.layout = layout;
+        this.f0 = f0;
+        this.f1 = f1;
+        this.f2 = f2;
+        this.f3 = f3;
+    }
 
-  public <E> StructBuilder5<A, B, C, D, E> field(String name, Type.Sized<E> type) {
-    var placement = layout.append(name, type);
-    return new StructBuilder5<A, B, C, D, E>(this.name, placement.layout(), a, b, c, d, placement.field());
-  }
+    public <F4> StructBuilder5<F0, F1, F2, F3, F4> field(String name, Type.Sized<F4> type) {
+        var placement = layout.append(name, type);
+        return new StructBuilder5<F0, F1, F2, F3, F4>(this.name, placement.layout(), f0, f1, f2, f3, placement.field());
+    }
 
-  public StructBuilder4<A, B, C, D> padding(long bytes) {
-    return new StructBuilder4<A, B, C, D>(this.name, layout.padding(bytes), a, b, c, d);
-  }
+    public StructBuilder4<F0, F1, F2, F3> padding(long bytes) {
+        return new StructBuilder4<F0, F1, F2, F3>(this.name, layout.padding(bytes), f0, f1, f2, f3);
+    }
 
-  public <T> Type.Sized<T> build(StructBuilder4.Constructor<A, B, C, D, T> constructor) {
-    return layout.build(name, (pointer, resolved) -> constructor.create(a.read(pointer, resolved), b.read(pointer, resolved), c.read(pointer, resolved), d.read(pointer, resolved)));
-  }
+    public <T> Type.Sized<T> build(StructBuilder4.Constructor<F0, F1, F2, F3, T> constructor) {
+        return layout.build(name, (pointer, resolved) -> constructor.create(f0.read(pointer, resolved), f1.read(pointer, resolved), f2.read(pointer, resolved), f3.read(pointer, resolved)));
+    }
 
-  @FunctionalInterface
-  public interface Constructor<A, B, C, D, T> {
-    T create(A a, B b, C c, D d);
-  }
+    @FunctionalInterface
+    public interface Constructor<F0, F1, F2, F3, T> {
+        T create(F0 f0, F1 f1, F2 f2, F3 f3);
+    }
 }

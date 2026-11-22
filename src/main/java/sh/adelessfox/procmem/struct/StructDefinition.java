@@ -13,17 +13,17 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 
-record StructDefinition(List<StructMember> members) {
+record StructDefinition(String name, List<StructMember> members) {
     StructDefinition {
         members = List.copyOf(members);
     }
 
-    static StructDefinition empty() {
-        return new StructDefinition(List.of());
+    static StructDefinition empty(String name) {
+        return new StructDefinition(name, List.of());
     }
 
     <T> Placement<T> append(String name, Type.Sized<T> type) {
-        var field = new StructMember.Field<>(members.size(), name, type);
+        var field = new StructMember.Field<>(members.size(), this.name, name, type);
         var layout = append(field);
         return new Placement<>(layout, field);
     }
@@ -41,7 +41,7 @@ record StructDefinition(List<StructMember> members) {
     private StructDefinition append(StructMember member) {
         var members = new ArrayList<>(members());
         members.add(member);
-        return new StructDefinition(members);
+        return new StructDefinition(name, members);
     }
 
     <T> Type.Sized<T> build(String name, BiFunction<Pointer, StructLayout, T> reader) {
