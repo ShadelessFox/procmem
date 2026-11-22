@@ -12,10 +12,54 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
-record StructDefinition(String name, List<StructMember> members) {
-    StructDefinition {
-        members = List.copyOf(members);
+/**
+ * An immutable structure declaration, including fields and explicit padding in declaration order.
+ */
+public final class StructDefinition {
+    private final String name;
+    private final List<StructMember> members;
+    private final ConcurrentHashMap<MemoryLayout, StructLayout> layouts = new ConcurrentHashMap<>();
+
+    private StructDefinition(String name, List<StructMember> members) {
+        this.name = name;
+        this.members = List.copyOf(members);
+    }
+
+    /**
+     * Creates a new structure builder.
+     */
+    public static Builder builder(String name) {
+        return new Builder(name);
+    }
+
+    /**
+     * Returns the name of this structure.
+     */
+    public String name() {
+        return name;
+    }
+
+    /**
+     * Returns the members in declaration order.
+     */
+    public List<StructMember> members() {
+        return members;
+    }
+
+    /**
+     * Binds this definition to a Java value reader.
+     */
+    public <T> StructType<T> bind(Function<StructReader, T> reader) {
+        return build((pointer, resolved) -> reader.apply(new StructReader(pointer, resolved)));
+    }
+
+    /**
+     * Resolves member layouts and offsets for the target.
+     */
+    public StructLayout resolve(MemoryLayout target) {
+        return layouts.computeIfAbsent(target, this::resolveLayout);
     }
 
     static StructDefinition empty(String name) {
@@ -23,72 +67,52 @@ record StructDefinition(String name, List<StructMember> members) {
     }
 
     <T> Placement<T> append(String name, Type.Sized<T> type) {
+        for (var member : members) {
+            if (member instanceof StructMember.Field<?> field && field.name().equals(name)) {
+                throw new IllegalArgumentException("Duplicate field: " + name);
+            }
+        }
         var field = new StructMember.Field<>(members.size(), this.name, name, type);
-        var layout = append(field);
-        return new Placement<>(layout, field);
+        return new Placement<>(append(field), field);
     }
 
     StructDefinition padding(long bytes) {
         if (bytes < 0) {
             throw new IllegalArgumentException("padding must be non-negative");
         }
-        if (bytes == 0) {
-            return this;
-        }
-        return append(new StructMember.Padding(bytes));
+        return bytes == 0 ? this : append(new StructMember.Padding(bytes));
     }
 
     private StructDefinition append(StructMember member) {
-        var members = new ArrayList<>(members());
-        members.add(member);
-        return new StructDefinition(name, members);
+        var copy = new ArrayList<>(members);
+        copy.add(member);
+        return new StructDefinition(name, copy);
     }
 
-    <T> Type.Sized<T> build(String name, BiFunction<Pointer, StructLayout, T> reader) {
-        return new Type.Sized<T>() {
-            final ConcurrentHashMap<MemoryLayout, StructLayout> layouts = new ConcurrentHashMap<>();
-
-            @Override
-            public TypeLayout layout(MemoryLayout target) {
-                return resolve(target).layout();
-            }
-
-            @Override
-            public T read(Pointer pointer) {
-                return reader.apply(pointer, resolve(pointer.layout()));
-            }
-
-            @Override
-            public String toString() {
-                return name;
-            }
-
-            StructLayout resolve(MemoryLayout target) {
-                return layouts.computeIfAbsent(target, StructDefinition.this::resolve);
-            }
-        };
+    <T> StructType<T> build(BiFunction<Pointer, StructLayout, T> reader) {
+        return new StructType<>(this, reader);
     }
 
-    StructLayout resolve(MemoryLayout target) {
-        var end = 0L;
-        var alignment = 1L;
-        var offsets = new long[members.size()];
-        for (int i = 0; i < members.size(); i++) {
-            switch (members.get(i)) {
+    private StructLayout resolveLayout(MemoryLayout target) {
+        long end = 0;
+        long alignment = 1;
+        var resolved = new ArrayList<StructLayout.Member>();
+        for (var member : members) {
+            switch (member) {
                 case StructMember.Field<?> field -> {
                     var layout = field.type().layout(target);
-                    var offset = align(end, layout.alignment());
-                    offsets[i] = offset;
+                    long offset = align(end, layout.alignment());
+                    resolved.add(new StructLayout.Member(field, offset, layout));
                     end = Math.addExact(offset, layout.size());
                     alignment = Math.max(alignment, layout.alignment());
                 }
                 case StructMember.Padding padding -> {
-                    offsets[i] = end;
+                    resolved.add(new StructLayout.Member(padding, end, new TypeLayout(padding.bytes(), 1)));
                     end = Math.addExact(end, padding.bytes());
                 }
             }
         }
-        return new StructLayout(new TypeLayout(align(end, alignment), alignment), offsets);
+        return new StructLayout(this, new TypeLayout(align(end, alignment), alignment), resolved);
     }
 
     private static long align(long value, long alignment) {
@@ -99,6 +123,38 @@ record StructDefinition(String name, List<StructMember> members) {
     record Placement<T>(StructDefinition layout, StructMember.Field<T> field) {
     }
 
-    record StructLayout(TypeLayout layout, long[] offsets) {
+    /**
+     * A mutable declaration builder; built definitions are immutable snapshots.
+     */
+    public static final class Builder {
+        private StructDefinition definition;
+
+        private Builder(String name) {
+            definition = empty(name);
+        }
+
+        /**
+         * Appends a field and returns its typed handle.
+         */
+        public <T> StructMember.Field<T> field(String name, Type.Sized<T> type) {
+            var placement = definition.append(name, type);
+            definition = placement.layout();
+            return placement.field();
+        }
+
+        /**
+         * Appends explicit padding.
+         */
+        public Builder padding(long bytes) {
+            definition = definition.padding(bytes);
+            return this;
+        }
+
+        /**
+         * Returns the current definition snapshot.
+         */
+        public StructDefinition build() {
+            return definition;
+        }
     }
 }

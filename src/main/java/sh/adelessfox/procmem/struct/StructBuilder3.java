@@ -34,8 +34,8 @@ public final class StructBuilder3<F0, F1, F2> {
         return new StructBuilder3<F0, F1, F2>(this.name, layout.padding(bytes), f0, f1, f2);
     }
 
-    public <T> Type.Sized<T> build(StructBuilder3.Constructor<F0, F1, F2, T> constructor) {
-        return layout.build(name, (pointer, resolved) -> constructor.create(f0.read(pointer, resolved), f1.read(pointer, resolved), f2.read(pointer, resolved)));
+    public <T> StructType<T> build(StructBuilder3.Constructor<F0, F1, F2, T> constructor) {
+        return layout.build((pointer, resolved) -> constructor.create(f0.read(pointer, resolved), f1.read(pointer, resolved), f2.read(pointer, resolved)));
     }
 
     @FunctionalInterface

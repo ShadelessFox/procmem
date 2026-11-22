@@ -17,12 +17,12 @@ import java.util.stream.IntStream;
 public final class GenerateStructBuilders {
     private static final int MAX_FIELDS = 16;
 
-    private static final String PACKAGE_NAME = "sh.adelessfox.procmem";
-    private static final Path DIRECTORY = Path.of("src/main/java");
+    private static final Path DIRECTORY = Path.of("C:/Users/ShadelessFox/IdeaProjects/odradek/lib/procmem/src/main/java");
     private static final String PACKAGE_NAME = "sh.adelessfox.procmem.struct";
 
+    private static final ClassName STRUCT_MEMBER_FIELD_NAME = ClassName.get(StructMember.Field.class);
+    private static final ClassName STRUCT_TYPE_NAME = ClassName.get(StructType.class);
     private static final ClassName TYPE_SIZED_NAME = ClassName.get(Type.Sized.class);
-    private static final ClassName STRUCT_MEMBER_FIELD = ClassName.get(StructMember.Field.class);
     private static final TypeVariableName T_NAME = TypeVariableName.get("T");
 
     static void main() throws IOException {
@@ -83,7 +83,7 @@ public final class GenerateStructBuilders {
             .addStatement("this.layout = layout");
 
         for (TypeVariableName argument : arguments) {
-            var fieldType = ParameterizedTypeName.get(STRUCT_MEMBER_FIELD, argument);
+            var fieldType = ParameterizedTypeName.get(STRUCT_MEMBER_FIELD_NAME, argument);
             var fieldName = argument.name.toLowerCase(Locale.ROOT);
 
             builder.addField(fieldType, fieldName, Modifier.PRIVATE, Modifier.FINAL);
@@ -104,8 +104,8 @@ public final class GenerateStructBuilders {
             .addModifiers(Modifier.PUBLIC)
             .addTypeVariable(T_NAME)
             .addParameter(makeConstructorName(arity), "constructor")
-            .returns(ParameterizedTypeName.get(TYPE_SIZED_NAME, T_NAME))
-            .addStatement("return layout.build(name, (pointer, resolved) -> constructor.create($L))", String.join(", ", params))
+            .returns(ParameterizedTypeName.get(STRUCT_TYPE_NAME, T_NAME))
+            .addStatement("return layout.build((pointer, resolved) -> constructor.create($L))", String.join(", ", params))
             .build();
     }
 

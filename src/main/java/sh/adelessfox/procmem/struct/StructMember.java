@@ -6,14 +6,50 @@ package sh.adelessfox.procmem.struct;
 import sh.adelessfox.procmem.Pointer;
 import sh.adelessfox.procmem.Type;
 
-sealed interface StructMember {
-    record Field<T>(int index, String struct, String name, Type.Sized<T> type) implements StructMember {
-        T read(Pointer pointer, StructDefinition.StructLayout resolved) {
+/**
+ * A declared field or explicit padding within a structure.
+ */
+public sealed interface StructMember {
+    /**
+     * A typed field handle belonging to definitions that contain this exact field.
+     */
+    final class Field<T> implements StructMember {
+        private final int index;
+        private final String struct;
+        private final String name;
+        private final Type.Sized<T> type;
+
+        Field(int index, String struct, String name, Type.Sized<T> type) {
+            this.index = index;
+            this.struct = struct;
+            this.name = name;
+            this.type = type;
+        }
+
+        public String name() {
+            return name;
+        }
+
+        public Type.Sized<T> type() {
+            return type;
+        }
+
+        int index() {
+            return index;
+        }
+
+        T read(Pointer pointer, StructLayout resolved) {
+            long offset = resolved.offset(this);
             try {
-                return type.read(pointer.add(resolved.offsets()[index]));
+                return type.read(pointer.add(offset));
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to read field " + struct + '.' + name + ": " + e.getMessage(), e);
             }
+        }
+
+        @Override
+        public String toString() {
+            return struct + '.' + name + ": " + type;
         }
     }
 

@@ -101,21 +101,6 @@ public abstract class Type<T> {
     }
 
     /**
-     * Creates a new {@link Sized sized type} with the given reader, size, and alignment.
-     * <p>
-     * The name of the type is derived from the size.
-     *
-     * @param reader    the function to read a value of type {@code T} from a {@link Pointer}
-     * @param size      the size of the type in bytes
-     * @param alignment the alignment of the type in bytes
-     * @param <T>       the type of value
-     * @return a new {@link Sized} type
-     */
-    public static <T> Sized<T> of(Function<Pointer, T> reader, long size, long alignment) {
-        return of(reader, size, alignment, "[" + size + " bytes]");
-    }
-
-    /**
      * Creates a new {@link Type} with the given reader and name.
      *
      * @param reader the function to read a value of type {@code T} from a {@link Pointer}

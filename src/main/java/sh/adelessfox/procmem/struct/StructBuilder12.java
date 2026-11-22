@@ -65,9 +65,9 @@ public final class StructBuilder12<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, 
         return new StructBuilder12<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11>(this.name, layout.padding(bytes), f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11);
     }
 
-    public <T> Type.Sized<T> build(
+    public <T> StructType<T> build(
             StructBuilder12.Constructor<F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, T> constructor) {
-        return layout.build(name, (pointer, resolved) -> constructor.create(f0.read(pointer, resolved), f1.read(pointer, resolved), f2.read(pointer, resolved), f3.read(pointer, resolved), f4.read(pointer, resolved), f5.read(pointer, resolved), f6.read(pointer, resolved), f7.read(pointer, resolved), f8.read(pointer, resolved), f9.read(pointer, resolved), f10.read(pointer, resolved), f11.read(pointer, resolved)));
+        return layout.build((pointer, resolved) -> constructor.create(f0.read(pointer, resolved), f1.read(pointer, resolved), f2.read(pointer, resolved), f3.read(pointer, resolved), f4.read(pointer, resolved), f5.read(pointer, resolved), f6.read(pointer, resolved), f7.read(pointer, resolved), f8.read(pointer, resolved), f9.read(pointer, resolved), f10.read(pointer, resolved), f11.read(pointer, resolved)));
     }
 
     @FunctionalInterface
