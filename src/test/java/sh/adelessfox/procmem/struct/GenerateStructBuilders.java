@@ -15,7 +15,7 @@ import java.util.Locale;
 import java.util.stream.IntStream;
 
 public final class GenerateStructBuilders {
-    private static final int MAX_FIELDS = 16;
+    private static final int MAX_FIELDS = 64;
 
     private static final Path DIRECTORY = Path.of("C:/Users/ShadelessFox/IdeaProjects/odradek/lib/procmem/src/main/java");
     private static final String PACKAGE_NAME = "sh.adelessfox.procmem.struct";

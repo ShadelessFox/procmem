@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT
-// SPDX-FileCopyrightText: 2026 ShadelessFox
-
 package sh.adelessfox.procmem.struct;
 
 import sh.adelessfox.procmem.Type;
@@ -30,11 +27,11 @@ public final class StructBuilder4<F0, F1, F2, F3> {
 
     public <F4> StructBuilder5<F0, F1, F2, F3, F4> field(String name, Type.Sized<F4> type) {
         var placement = layout.append(name, type);
-        return new StructBuilder5<F0, F1, F2, F3, F4>(this.name, placement.layout(), f0, f1, f2, f3, placement.field());
+        return new StructBuilder5<>(this.name, placement.layout(), f0, f1, f2, f3, placement.field());
     }
 
     public StructBuilder4<F0, F1, F2, F3> padding(long bytes) {
-        return new StructBuilder4<F0, F1, F2, F3>(this.name, layout.padding(bytes), f0, f1, f2, f3);
+        return new StructBuilder4<>(this.name, layout.padding(bytes), f0, f1, f2, f3);
     }
 
     public <T> StructType<T> build(StructBuilder4.Constructor<F0, F1, F2, F3, T> constructor) {
