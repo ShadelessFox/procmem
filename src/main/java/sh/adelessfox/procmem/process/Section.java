@@ -57,7 +57,9 @@ public final class Section {
         return permissions;
     }
 
-    /** Returns a non-owning memory view bounded by this section's runtime extent. */
+    /**
+     * Returns a non-owning memory view bounded by this section's runtime extent.
+     */
     public Memory memory() {
         return process.memory(base, size);
     }

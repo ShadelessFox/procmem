@@ -27,7 +27,7 @@ public record Ref<T>(Type<T> type, Pointer pointer) {
         if (!(type instanceof Type.Sized<T> sized)) {
             throw new IllegalArgumentException("Type must be sized to create a slice");
         }
-        return new Slice<>(sized, pointer, length);
+        return sized.slice(pointer, length);
     }
 
     public <R> Ref<R> map(Type<R> newType) {

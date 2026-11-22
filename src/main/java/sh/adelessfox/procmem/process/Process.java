@@ -93,7 +93,9 @@ public abstract sealed class Process
 
     public abstract List<Region> regions();
 
-    /** Returns the committed region containing an absolute address, if any. */
+    /**
+     * Returns the committed region containing an absolute address, if any.
+     */
     public Optional<Region> region(long address) {
         ensureOpen();
         return regions().stream()

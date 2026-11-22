@@ -11,8 +11,8 @@ package sh.adelessfox.procmem;
  */
 public record TypeLayout(long size, long alignment) {
     public TypeLayout {
-        if (size <= 0) {
-            throw new IllegalArgumentException("Size must be positive");
+        if (size < 0) {
+            throw new IllegalArgumentException("Size must be non-negative");
         }
         if (alignment <= 0) {
             throw new IllegalArgumentException("Alignment must be positive");

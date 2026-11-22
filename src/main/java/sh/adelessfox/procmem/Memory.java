@@ -80,7 +80,9 @@ public abstract class Memory {
         }
     }
 
-    /** Reads a nonempty, already bounds-checked range at an absolute address. */
+    /**
+     * Reads a nonempty, already bounds-checked range at an absolute address.
+     */
     protected abstract void readImpl(long address, ByteBuffer dst);
 
     /**
@@ -202,7 +204,9 @@ public abstract class Memory {
         return charset.decode(buffer).toString();
     }
 
-    /** Reads a NUL-terminated ISO-8859-1 string with a 256-byte limit, including the terminator. */
+    /**
+     * Reads a NUL-terminated ISO-8859-1 string with a 256-byte limit, including the terminator.
+     */
     public final String readCString(long address) {
         return readCString(address, 256);
     }
@@ -230,7 +234,7 @@ public abstract class Memory {
         return value;
     }
 
-    static int terminatorWidth(Charset charset) {
+    private static int terminatorWidth(Charset charset) {
         return (switch (charset.name()) {
             case "UTF-16", "UTF-16BE", "UTF-16LE" -> 2;
             case "UTF-32", "UTF-32BE", "UTF-32LE" -> 4;
@@ -238,7 +242,7 @@ public abstract class Memory {
         });
     }
 
-    static int findTerminator(ByteBuffer buffer, int width) {
+    private static int findTerminator(ByteBuffer buffer, int width) {
         for (int offset = 0; offset <= buffer.limit() - width; offset += width) {
             int value = 0;
             for (int i = 0; i < width; i++) {
@@ -270,7 +274,9 @@ public abstract class Memory {
         }
     }
 
-    /** Writes a nonempty, already bounds-checked range at an absolute address. */
+    /**
+     * Writes a nonempty, already bounds-checked range at an absolute address.
+     */
     protected abstract void writeImpl(long address, ByteBuffer src);
 
     /**

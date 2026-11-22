@@ -53,7 +53,9 @@ public final class Region {
         return permissions;
     }
 
-    /** Whether the region has guard protection, independently of its underlying permissions. */
+    /**
+     * Whether the region has guard protection, independently of its underlying permissions.
+     */
     public boolean guarded() {
         return guarded;
     }

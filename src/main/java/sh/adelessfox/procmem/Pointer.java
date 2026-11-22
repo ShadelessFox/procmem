@@ -58,17 +58,23 @@ public final class Pointer implements Comparable<Pointer> {
         return memory().readDouble(address);
     }
 
-    /** Reads a string of {@code length} bytes, truncated at the first NUL if present. */
+    /**
+     * Reads a string of {@code length} bytes, truncated at the first NUL if present.
+     */
     public String readString(Charset charset, int length) {
         return memory().readString(address, charset, length);
     }
 
-    /** Reads a NUL-terminated ISO-8859-1 string with a 256-byte limit, including the terminator. */
+    /**
+     * Reads a NUL-terminated ISO-8859-1 string with a 256-byte limit, including the terminator.
+     */
     public String readCString() {
         return memory().readCString(address);
     }
 
-    /** Reads a NUL-terminated ISO-8859-1 string with a {@code maxLength}-byte limit, including the terminator. */
+    /**
+     * Reads a NUL-terminated ISO-8859-1 string with a {@code maxLength}-byte limit, including the terminator.
+     */
     public String readCString(int maxLength) {
         return memory().readCString(address, maxLength);
     }
@@ -112,7 +118,7 @@ public final class Pointer implements Comparable<Pointer> {
     }
 
     public MemoryLayout layout() {
-        return process.layout();
+        return memory != null ? memory.layout() : process.layout();
     }
 
     @Override
