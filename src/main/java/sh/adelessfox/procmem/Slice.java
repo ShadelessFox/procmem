@@ -47,7 +47,7 @@ public record Slice<T>(Type.Sized<T> type, Pointer pointer, int length) implemen
      * @return the stride of the slice in bytes
      */
     public long stride() {
-        return type.layout(pointer.memory().layout()).size();
+        return type.layout(pointer.layout()).size();
     }
 
     /**

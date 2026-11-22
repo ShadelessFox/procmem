@@ -5,6 +5,7 @@ package sh.adelessfox.procmem.process;
 
 import sh.adelessfox.procmem.Memory;
 import sh.adelessfox.procmem.MemoryLayout;
+import sh.adelessfox.procmem.Pointer;
 import sh.adelessfox.procmem.util.Platform;
 
 import java.nio.ByteBuffer;
@@ -21,19 +22,28 @@ import java.util.OptionalLong;
  *
  * @see Memory
  */
-public abstract sealed class Process extends Memory
+public abstract sealed class Process
     implements AutoCloseable
     permits Win32Process, LinuxProcess {
 
     final long pid;
     final MemoryLayout layout;
-    final ByteBuffer scratch;
+    private boolean closed;
 
     Process(long pid, MemoryLayout layout) {
-        super(0);
         this.pid = pid;
         this.layout = layout;
-        this.scratch = ByteBuffer.allocate(8).order(layout.byteOrder());
+    }
+
+    /**
+     * Opens a process for its PID.
+     *
+     * @param pid the PID of the process to open
+     * @return the opened process
+     */
+    public static Process open(long pid) {
+        var factory = ProcessFactory.get();
+        return factory.open(pid);
     }
 
     /**
@@ -48,50 +58,6 @@ public abstract sealed class Process extends Memory
         return pid.stream()
             .mapToObj(Process::open)
             .findFirst();
-    }
-
-    @Override
-    public byte readByte(long offset) {
-        read(offset, scratch.position(0));
-        return scratch.get(0);
-    }
-
-    @Override
-    public short readShort(long offset) {
-        read(offset, scratch.position(0));
-        return scratch.getShort(0);
-    }
-
-    @Override
-    public int readInt(long offset) {
-        read(offset, scratch.position(0));
-        return scratch.getInt(0);
-    }
-
-    @Override
-    public long readLong(long offset) {
-        read(offset, scratch.position(0));
-        return scratch.getLong(0);
-    }
-
-    @Override
-    public void writeByte(long offset, byte value) {
-        write(offset, scratch.position(0).put(0, value));
-    }
-
-    @Override
-    public void writeShort(long offset, short value) {
-        write(offset, scratch.position(0).putShort(0, value));
-    }
-
-    @Override
-    public void writeInt(long offset, int value) {
-        write(offset, scratch.position(0).putInt(0, value));
-    }
-
-    @Override
-    public void writeLong(long offset, long value) {
-        write(offset, scratch.position(0).putLong(0, value));
     }
 
     /**
@@ -110,7 +76,7 @@ public abstract sealed class Process extends Memory
      * @param name the name of the module to find
      * @return an {@link Optional} containing the module if found, or an empty {@link Optional} otherwise
      */
-    public Optional<Module> module(String name) {
+    public final Optional<Module> module(String name) {
         var ignoreCase = Platform.current() == Platform.WINDOWS;
         return modules().stream()
             .filter(module -> ignoreCase ? module.name().equalsIgnoreCase(name) : module.name().equals(name))
@@ -119,27 +85,76 @@ public abstract sealed class Process extends Memory
 
     public abstract List<Section> sections(Module module);
 
-    public Optional<Section> section(Module module, String name) {
-        var ignoreCase = Platform.current() == Platform.WINDOWS;
+    public final Optional<Section> section(Module module, String name) {
         return sections(module).stream()
-            .filter(section -> ignoreCase ? section.name().equalsIgnoreCase(name) : section.name().equals(name))
+            .filter(section -> section.name().equals(name))
             .findFirst();
+    }
+
+    public abstract List<Region> regions();
+
+    /** Returns the committed region containing an absolute address, if any. */
+    public Optional<Region> region(long address) {
+        ensureOpen();
+        return regions().stream()
+            .filter(region -> region.contains(address))
+            .findFirst();
+    }
+
+    public final Pointer pointer(long address) {
+        return new Pointer(this, address);
+    }
+
+    public final long pid() {
+        return pid;
+    }
+
+    public final MemoryLayout layout() {
+        return layout;
+    }
+
+    final Memory memory(long base, long size) {
+        return new Memory(this, layout, base, size) {
+            @Override
+            protected void readImpl(long address, ByteBuffer dst) {
+                ensureOpen();
+                Process.this.read(address, dst);
+            }
+
+            @Override
+            protected void writeImpl(long address, ByteBuffer src) {
+                ensureOpen();
+                Process.this.write(address, src);
+            }
+        };
+    }
+
+    abstract void read(long address, ByteBuffer dst);
+
+    abstract void write(long address, ByteBuffer src);
+
+    final void ensureOpen() {
+        if (closed) {
+            throw new IllegalStateException("Process is closed");
+        }
     }
 
     /**
      * Closes the process and releases any resources associated with it.
      */
     @Override
-    public abstract void close();
+    public final void close() {
+        if (!closed) {
+            closed = true;
+            closeImpl();
+        }
+    }
+
+    abstract void closeImpl();
 
     @Override
     public String toString() {
         return "Process[pid=%d, layout=%s]".formatted(pid, layout);
-    }
-
-    private static Process open(long pid) {
-        var factory = ProcessFactory.get();
-        return factory.open(pid);
     }
 
     private static OptionalLong find(String name, boolean ignoreCase) {

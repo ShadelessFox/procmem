@@ -13,10 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
 
 import static java.lang.foreign.MemoryLayout.PathElement.groupElement;
@@ -30,9 +27,9 @@ final class Win32Process extends Process {
         this.handle = handle;
     }
 
-    static Win32Process open(long pid) {
+    static Win32Process of(long pid) {
         var handle = Kernel32.openProcess(
-            Kernel32.PROCESS_VM_READ | Kernel32.PROCESS_QUERY_LIMITED_INFORMATION,
+            Kernel32.PROCESS_VM_READ | Kernel32.PROCESS_QUERY_INFORMATION,
             false,
             Math.toIntExact(pid));
         if (handle.address() == 0L) {
@@ -48,14 +45,14 @@ final class Win32Process extends Process {
             Math.toIntExact(pid));
         var modules = new ArrayList<Module>();
         try (var arena = Arena.ofConfined()) {
-            var entry = Kernel32.MODULEENTRY32W.allocate(arena);
+            var entry = Kernel32.ModuleEntry32W.allocate(arena);
             if (Kernel32.module32FirstW(snapshot, entry)) {
                 do {
                     var name = entry.moduleName();
                     var path = Path.of(entry.modulePath());
                     var base = entry.baseAddr().address();
                     var size = entry.baseSize();
-                    modules.add(new Module(name, path, base, size));
+                    modules.add(new Module(this, name, path, base, size));
                 } while (Kernel32.module32NextW(snapshot, entry));
             }
         } finally {
@@ -79,7 +76,7 @@ final class Win32Process extends Process {
             throw new IllegalArgumentException("Invalid PE signature");
         }
 
-        var fixedHeaderSize = NtHeaders.TYPE.layout(layout()).size();
+        var fixedHeaderSize = NtHeaders.TYPE.layout(layout).size();
         var table = ntPointer.add(fixedHeaderSize + nt.optionalHeaderSize());
 
         var sections = new ArrayList<Section>();
@@ -88,47 +85,82 @@ final class Win32Process extends Process {
             var size = header.virtualSize();
             var permissions = header.mapCharacteristicsToPermissions();
 
-            sections.add(new Section(header.name(), base, size, permissions));
+            sections.add(new Section(this, header.name(), base, size, permissions));
         }
 
         return List.copyOf(sections);
     }
 
     @Override
-    public MemoryLayout layout() {
-        return layout;
+    public List<Region> regions() {
+        ensureOpen();
+        var regions = new ArrayList<Region>();
+        try (var arena = Arena.ofConfined()) {
+            var information = Kernel32.MemoryBasicInformation.allocate(arena);
+            long address = 0;
+            while (Kernel32.virtualQueryEx(handle, address, information)) {
+                long end = information.checkedEnd(address);
+                if (information.state() == Kernel32.MEM_COMMIT) {
+                    regions.add(toRegion(information));
+                }
+                address = end;
+            }
+        }
+        return List.copyOf(regions);
     }
 
     @Override
-    public void read(long offset, ByteBuffer dst) {
-        try {
-            Kernel32.readProcessMemory(
-                handle,
-                MemorySegment.ofAddress(offset),
-                dst,
-                dst.remaining(),
-                MemorySegment.NULL);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to read %d bytes at %#x from process %d".formatted(dst.remaining(), offset, pid), e);
+    public Optional<Region> region(long address) {
+        ensureOpen();
+        if (address < 0) {
+            throw new IllegalArgumentException("address must be non-negative");
+        }
+        try (var arena = Arena.ofConfined()) {
+            var information = Kernel32.MemoryBasicInformation.allocate(arena);
+            if (!Kernel32.virtualQueryEx(handle, address, information)) {
+                return Optional.empty();
+            }
+            information.checkedEnd(address);
+            return information.state() == Kernel32.MEM_COMMIT
+                ? Optional.of(toRegion(information))
+                : Optional.empty();
         }
     }
 
-    @Override
-    public void write(long address, ByteBuffer src) {
-        try {
-            Kernel32.writeProcessMemory(
-                handle,
-                MemorySegment.ofAddress(address),
-                src,
-                src.remaining(),
-                MemorySegment.NULL);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to write %d bytes at %#x to process %d".formatted(src.remaining(), address, pid), e);
-        }
+    private Region toRegion(Kernel32.MemoryBasicInformation information) {
+        return new Region(
+            this,
+            information.baseAddress(),
+            information.regionSize(),
+            mapProtectionToPermissions(information.protect()),
+            (information.protect() & Kernel32.PAGE_GUARD) != 0);
+    }
+
+    private static Set<Permission> mapProtectionToPermissions(int protection) {
+        return switch (protection & 0xff) {
+            // @formatter:off
+            case Kernel32.PAGE_READONLY -> Set.of(Permission.READ);
+            case Kernel32.PAGE_READWRITE, Kernel32.PAGE_WRITECOPY -> Set.of(Permission.READ, Permission.WRITE);
+            case Kernel32.PAGE_EXECUTE -> Set.of(Permission.EXECUTE);
+            case Kernel32.PAGE_EXECUTE_READ -> Set.of(Permission.READ, Permission.EXECUTE);
+            case Kernel32.PAGE_EXECUTE_READWRITE, Kernel32.PAGE_EXECUTE_WRITECOPY -> Set.of(Permission.READ, Permission.WRITE, Permission.EXECUTE);
+            default -> Set.of();
+            // @formatter:on
+        };
     }
 
     @Override
-    public void close() {
+    void read(long address, ByteBuffer dst) {
+        Kernel32.readProcessMemory(handle, MemorySegment.ofAddress(address), dst, dst.remaining(), MemorySegment.NULL);
+    }
+
+    @Override
+    void write(long address, ByteBuffer src) {
+        Kernel32.writeProcessMemory(handle, MemorySegment.ofAddress(address), src, src.remaining(), MemorySegment.NULL);
+    }
+
+    @Override
+    void closeImpl() {
         try {
             Kernel32.closeHandle(handle);
         } catch (Exception e) {
@@ -168,11 +200,7 @@ final class Win32Process extends Process {
         Type.INT.map(Integer::toUnsignedLong);
 
     private static final Type.Sized<String> SECTION_NAME = Type.of(
-        pointer -> {
-            var name = pointer.readString(StandardCharsets.US_ASCII, 8);
-            int terminator = name.indexOf('\0');
-            return terminator < 0 ? name : name.substring(0, terminator);
-        }, 8, 1, "SectionName");
+        pointer -> pointer.readString(StandardCharsets.US_ASCII, 8), 8, 1, "SectionName");
 
     private record NtHeaders(
         int signature,
@@ -203,16 +231,16 @@ final class Win32Process extends Process {
             .field("characteristics", Type.INT)    // 36
             .build(SectionHeader::new);            // Size: 40
 
-        private Set<Section.Permission> mapCharacteristicsToPermissions() {
-            var permissions = EnumSet.noneOf(Section.Permission.class);
+        private Set<Permission> mapCharacteristicsToPermissions() {
+            var permissions = EnumSet.noneOf(Permission.class);
             if ((characteristics & 0x40000000) != 0) {
-                permissions.add(Section.Permission.READ);
+                permissions.add(Permission.READ);
             }
             if ((characteristics & 0x80000000) != 0) {
-                permissions.add(Section.Permission.WRITE);
+                permissions.add(Permission.WRITE);
             }
             if ((characteristics & 0x20000000) != 0) {
-                permissions.add(Section.Permission.EXECUTE);
+                permissions.add(Permission.EXECUTE);
             }
             return Set.copyOf(permissions);
         }
@@ -221,7 +249,7 @@ final class Win32Process extends Process {
     private static final class Kernel32 {
         // OpenProcess
         static final int PROCESS_VM_READ = 0x10;
-        static final int PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+        static final int PROCESS_QUERY_INFORMATION = 0x0400;
 
         // IsWow64Process2
         static final int IMAGE_FILE_MACHINE_UNKNOWN = 0x0;
@@ -230,6 +258,19 @@ final class Win32Process extends Process {
         static final long INVALID_HANDLE_VALUE = -1L;
         static final int TH32CS_SNAPMODULE = 0x00000008;
         static final int TH32CS_SNAPMODULE32 = 0x00000010;
+
+        // VirtualQueryEx
+        static final int MEM_COMMIT = 0x1000;
+        static final int ERROR_INVALID_PARAMETER = 87;
+
+        static final int PAGE_EXECUTE = 0x10;
+        static final int PAGE_EXECUTE_READ = 0x20;
+        static final int PAGE_EXECUTE_READWRITE = 0x40;
+        static final int PAGE_EXECUTE_WRITECOPY = 0x80;
+        static final int PAGE_READONLY = 0x02;
+        static final int PAGE_READWRITE = 0x04;
+        static final int PAGE_WRITECOPY = 0x08;
+        static final int PAGE_GUARD = 0x100;
 
         // NT header stuff
         private static final int DOS_HEADER_SIZE = 64;
@@ -250,15 +291,16 @@ final class Win32Process extends Process {
         static final MethodHandle createToolhelp32Snapshot;
         static final MethodHandle module32FirstW;
         static final MethodHandle module32NextW;
+        static final MethodHandle virtualQueryEx;
 
         static final StructLayout captureStateLayout = Linker.Option.captureStateLayout();
         static final VarHandle captureStateLayout_getLastError = captureStateLayout.varHandle(groupElement("GetLastError"));
 
-        record MODULEENTRY32W(MemorySegment segment) {
-            static MODULEENTRY32W allocate(SegmentAllocator allocator) {
+        record ModuleEntry32W(MemorySegment segment) {
+            static ModuleEntry32W allocate(SegmentAllocator allocator) {
                 var segment = allocator.allocate(1080);
                 segment.set(JAVA_INT, 0, (int) segment.byteSize());
-                return new MODULEENTRY32W(segment);
+                return new ModuleEntry32W(segment);
             }
 
             MemorySegment baseAddr() {
@@ -275,6 +317,41 @@ final class Win32Process extends Process {
 
             String modulePath() {
                 return segment.getString(560, StandardCharsets.UTF_16LE);
+            }
+        }
+
+        record MemoryBasicInformation(MemorySegment segment) {
+            static MemoryBasicInformation allocate(SegmentAllocator allocator) {
+                return new MemoryBasicInformation(allocator.allocate(48, 8));
+            }
+
+            long baseAddress() {
+                return segment.get(ADDRESS, 0).address();
+            }
+
+            long regionSize() {
+                return segment.get(JAVA_LONG, 24);
+            }
+
+            int state() {
+                return segment.get(JAVA_INT, 32);
+            }
+
+            int protect() {
+                return segment.get(JAVA_INT, 36);
+            }
+
+            long checkedEnd(long address) {
+                long base = baseAddress();
+                long size = regionSize();
+                if (base < 0 || size <= 0 || size > Long.MAX_VALUE - base) {
+                    throw new IllegalStateException("VirtualQueryEx returned an invalid range");
+                }
+                long end = base + size;
+                if (base > address || end <= address) {
+                    throw new IllegalStateException("VirtualQueryEx returned a range that does not contain the queried address");
+                }
+                return end;
             }
         }
 
@@ -317,6 +394,10 @@ final class Win32Process extends Process {
                 lookup.findOrThrow("Module32NextW"),
                 FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS),
                 ccs);
+            virtualQueryEx = linker.downcallHandle(
+                lookup.findOrThrow("VirtualQueryEx"),
+                FunctionDescriptor.of(JAVA_LONG, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG),
+                ccs);
         }
 
         static MemorySegment openProcess(int desiredAccess, boolean inheritHandle, int processId) {
@@ -357,16 +438,17 @@ final class Win32Process extends Process {
             MemorySegment process,
             MemorySegment address,
             ByteBuffer buffer,
-            int size,
+            long size,
             MemorySegment numberOfBytesWritten
         ) {
             checked(
                 "WriteProcessMemory",
                 (arena, cs) -> {
                     var segment = arena.allocate(buffer.remaining());
+                    segment.asByteBuffer().put(buffer.duplicate());
                     int result = (int) writeProcessMemory.invokeExact(cs, process, address, segment, size, numberOfBytesWritten);
                     if (result != 0) {
-                        buffer.put(segment.asByteBuffer());
+                        buffer.position(buffer.limit());
                     }
                     return result;
                 },
@@ -387,18 +469,47 @@ final class Win32Process extends Process {
                 handle -> handle.address() != INVALID_HANDLE_VALUE);
         }
 
-        static boolean module32FirstW(MemorySegment snapshot, MODULEENTRY32W moduleEntry) {
+        static boolean module32FirstW(MemorySegment snapshot, ModuleEntry32W moduleEntry) {
             return checked(
                 "Module32FirstW",
                 (_, cs) -> (int) module32FirstW.invokeExact(cs, snapshot, moduleEntry.segment) != 0,
                 _ -> true);
         }
 
-        static boolean module32NextW(MemorySegment snapshot, MODULEENTRY32W moduleEntry) {
+        static boolean module32NextW(MemorySegment snapshot, ModuleEntry32W moduleEntry) {
             return checked(
                 "Module32NextW",
                 (_, cs) -> (int) module32NextW.invokeExact(cs, snapshot, moduleEntry.segment) != 0,
                 _ -> true);
+        }
+
+        static boolean virtualQueryEx(MemorySegment process, long address, MemoryBasicInformation information) {
+            try (var arena = Arena.ofConfined()) {
+                var cs = arena.allocate(captureStateLayout);
+                long returned;
+                try {
+                    returned = (long) virtualQueryEx.invokeExact(
+                        cs,
+                        process,
+                        MemorySegment.ofAddress(address),
+                        information.segment(),
+                        information.segment().byteSize());
+                } catch (Throwable e) {
+                    throw new AssertionError(e);
+                }
+                if (returned == 0) {
+                    int error = (int) captureStateLayout_getLastError.get(cs, 0L);
+                    if (error == ERROR_INVALID_PARAMETER) {
+                        // With a valid handle and buffer, the address is past the target's address space
+                        return false;
+                    }
+                    throw new IllegalStateException("VirtualQueryEx failed at %#x: %#x".formatted(address, error));
+                }
+                if (returned != information.segment().byteSize()) {
+                    throw new IllegalStateException("VirtualQueryEx returned an unexpected information size: " + returned);
+                }
+                return true;
+            }
         }
 
         private static <T> T checked(

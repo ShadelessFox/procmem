@@ -30,6 +30,10 @@ public record Ref<T>(Type<T> type, Pointer pointer) {
         return new Slice<>(sized, pointer, length);
     }
 
+    public <R> Ref<R> map(Type<R> newType) {
+        return new Ref<>(newType, pointer);
+    }
+
     @Override
     public String toString() {
         return type + " @ " + pointer;

@@ -6,13 +6,47 @@ package sh.adelessfox.procmem.process;
 import java.nio.file.Path;
 
 /**
- * Represents a module loaded in a process.
+ * Describes a module loaded in a process.
  *
- * @param name the name of the module
- * @param path the path to the module on disk
- * @param base the base address of the module in memory, in bytes
- * @param size the size of the module in memory, in bytes
  * @see Process#modules()
  */
-public record Module(String name, Path path, long base, long size) {
+public final class Module {
+    private final Process process;
+    private final String name;
+    private final Path path;
+    private final long base;
+    private final long size;
+
+    Module(Process process, String name, Path path, long base, long size) {
+        this.process = process;
+        this.name = name;
+        this.path = path;
+        this.base = base;
+        this.size = size;
+    }
+
+    public Process process() {
+        return process;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public Path path() {
+        return path;
+    }
+
+    public long base() {
+        return base;
+    }
+
+    public long size() {
+        return size;
+    }
+
+    @Override
+    public String toString() {
+        return "Module[name=%s, path=%s, base=%#x, size=%#x]".formatted(name, path, base, size);
+    }
 }

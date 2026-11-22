@@ -23,7 +23,7 @@ final class LinuxProcess extends Process {
         this.memory = memory;
     }
 
-    static LinuxProcess open(long pid) {
+    static LinuxProcess of(long pid) {
         try {
             var layout = processLayout(pid);
             var memory = FileChannel.open(Path.of("/proc", Long.toString(pid), "mem"), StandardOpenOption.READ);
@@ -44,40 +44,40 @@ final class LinuxProcess extends Process {
     }
 
     @Override
-    public MemoryLayout layout() {
-        return layout;
+    public List<Region> regions() {
+        throw new UnsupportedOperationException();
     }
 
     @Override
-    public void read(long offset, ByteBuffer dst) {
-        while (dst.hasRemaining()) {
-            try {
-                if (memory.read(dst, offset + dst.position()) <= 0) {
+    void read(long address, ByteBuffer dst) {
+        int start = dst.position();
+        try {
+            while (dst.hasRemaining()) {
+                if (memory.read(dst, address + (dst.position() - start)) <= 0) {
                     throw new EOFException("Incomplete process memory read");
                 }
-            } catch (IOException e) {
-                throw new IllegalStateException(
-                    "Failed to read %d more bytes at %#x from process %d".formatted(dst.remaining(), offset, pid), e);
             }
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read memory at %#x from process %d".formatted(address, pid), e);
         }
     }
 
     @Override
-    public void write(long address, ByteBuffer src) {
-        while (src.hasRemaining()) {
-            try {
-                if (memory.write(src, address + src.position()) <= 0) {
+    void write(long address, ByteBuffer src) {
+        int start = src.position();
+        try {
+            while (src.hasRemaining()) {
+                if (memory.write(src, address + (src.position() - start)) <= 0) {
                     throw new EOFException("Incomplete process memory write");
                 }
-            } catch (IOException e) {
-                throw new IllegalStateException(
-                    "Failed to write %d more bytes at %#x to process %d".formatted(src.remaining(), address, pid), e);
             }
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to write memory at %#x to process %d".formatted(address, pid), e);
         }
     }
 
     @Override
-    public void close() {
+    void closeImpl() {
         try {
             memory.close();
         } catch (IOException e) {

@@ -55,7 +55,7 @@ record StructDefinition(String name, List<StructMember> members) {
 
             @Override
             public T read(Pointer pointer) {
-                return reader.apply(pointer, resolve(pointer.memory().layout()));
+                return reader.apply(pointer, resolve(pointer.layout()));
             }
 
             @Override
