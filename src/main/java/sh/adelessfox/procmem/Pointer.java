@@ -9,12 +9,6 @@ import java.nio.charset.Charset;
  * Represents an absolute address in a memory view.
  */
 public record Pointer(Memory memory, long address) {
-    public Pointer {
-        if (address < 0) {
-            throw new IllegalArgumentException("address must be non-negative");
-        }
-    }
-
     public byte readByte() {
         return memory().readByte(address);
     }
