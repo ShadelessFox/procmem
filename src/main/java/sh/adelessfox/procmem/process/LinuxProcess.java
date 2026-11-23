@@ -39,7 +39,7 @@ final class LinuxProcess extends Process {
     }
 
     @Override
-    public List<Section> sections(Module module) {
+    List<Section> sections(Module module) {
         throw new UnsupportedOperationException();
     }
 

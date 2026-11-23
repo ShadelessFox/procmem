@@ -4,6 +4,8 @@
 package sh.adelessfox.procmem.process;
 
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Describes a module loaded in a process.
@@ -23,6 +25,16 @@ public final class Module {
         this.path = path;
         this.base = base;
         this.size = size;
+    }
+
+    public List<Section> sections() {
+        return process.sections(this);
+    }
+
+    public Optional<Section> section(String name) {
+        return sections().stream()
+            .filter(section -> section.name().equals(name))
+            .findFirst();
     }
 
     public Process process() {

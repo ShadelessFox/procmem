@@ -7,6 +7,7 @@ import sh.adelessfox.procmem.struct.StructBuilder0;
 
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * A unit of data that describes how to read a value of type {@code T} from a {@link Pointer}.
@@ -147,6 +148,13 @@ public abstract class Type<T> {
      */
     public static StructBuilder0 struct(String name) {
         return StructBuilder0.create(name);
+    }
+
+    /**
+     * Creates a reference type whose target type is resolved when a reference is read.
+     */
+    public static <T> Sized<Ref<T>> ref(Supplier<? extends Type<T>> supplier) {
+        return POINTER.map(pointer -> supplier.get().at(pointer));
     }
 
     /**

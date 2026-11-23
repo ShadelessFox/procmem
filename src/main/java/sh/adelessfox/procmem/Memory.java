@@ -13,6 +13,7 @@ import java.util.Objects;
 
 /**
  * Represents a bounded, non-owning view of process memory. All addresses are absolute.
+ * A view's bounds do not guarantee that every address within it is mapped or accessible.
  * <p>
  * Operations that take multibyte values will use the byte order specified by the {@link #layout() memory layout}.
  */
@@ -186,7 +187,6 @@ public abstract class Memory {
      * @param length  the field size in bytes, including any terminator and padding
      */
     public final String readString(long address, Charset charset, int length) {
-        Objects.requireNonNull(charset);
         if (length < 0) {
             throw new IllegalArgumentException("length must be non-negative");
         }
@@ -224,7 +224,6 @@ public abstract class Memory {
         if (maxLength <= 0) {
             throw new IllegalArgumentException("maxLength must be positive");
         }
-        checkRange(address, 1);
         int length = (int) Math.min(maxLength, size - (address - base));
         var value = readString(address, StandardCharsets.ISO_8859_1, length);
         if (value.length() == length) {
@@ -382,6 +381,14 @@ public abstract class Memory {
      */
     public Pointer pointer(long address) {
         return new Pointer(this, address);
+    }
+
+    public boolean contains(long address) {
+        return address >= base() && address < end();
+    }
+
+    public long end() {
+        return base() + size();
     }
 
     @Override

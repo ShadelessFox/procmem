@@ -30,8 +30,8 @@ public record Ref<T>(Type<T> type, Pointer pointer) {
         return sized.slice(pointer, length);
     }
 
-    public <R> Ref<R> map(Type<R> newType) {
-        return new Ref<>(newType, pointer);
+    public <R> Ref<R> reinterpret(Type<R> newType) {
+        return newType.at(pointer);
     }
 
     @Override

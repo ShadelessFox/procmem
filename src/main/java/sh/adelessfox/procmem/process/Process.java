@@ -28,11 +28,14 @@ public abstract sealed class Process
 
     final long pid;
     final MemoryLayout layout;
+
+    private final Memory addressSpace;
     private boolean closed;
 
     Process(long pid, MemoryLayout layout) {
         this.pid = pid;
         this.layout = layout;
+        this.addressSpace = memory(0, Long.MAX_VALUE);
     }
 
     /**
@@ -70,6 +73,8 @@ public abstract sealed class Process
      */
     public abstract List<Module> modules();
 
+    abstract List<Section> sections(Module module);
+
     /**
      * Returns the module with the given name, if it exists.
      *
@@ -80,14 +85,6 @@ public abstract sealed class Process
         var ignoreCase = Platform.current() == Platform.WINDOWS;
         return modules().stream()
             .filter(module -> ignoreCase ? module.name().equalsIgnoreCase(name) : module.name().equals(name))
-            .findFirst();
-    }
-
-    public abstract List<Section> sections(Module module);
-
-    public final Optional<Section> section(Module module, String name) {
-        return sections(module).stream()
-            .filter(section -> section.name().equals(name))
             .findFirst();
     }
 
@@ -103,8 +100,11 @@ public abstract sealed class Process
             .findFirst();
     }
 
+    /**
+     * Creates a pointer into this process's address space.
+     */
     public final Pointer pointer(long address) {
-        return new Pointer(this, address);
+        return addressSpace.pointer(address);
     }
 
     public final long pid() {

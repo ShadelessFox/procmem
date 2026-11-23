@@ -62,7 +62,7 @@ final class Win32Process extends Process {
     }
 
     @Override
-    public List<Section> sections(Module module) {
+    List<Section> sections(Module module) {
         var image = pointer(module.base());
         if (Short.toUnsignedInt(image.readShort()) != 0x5a4d) {
             throw new IllegalArgumentException("Invalid DOS signature");

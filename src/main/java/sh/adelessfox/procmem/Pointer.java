@@ -3,35 +3,16 @@
 
 package sh.adelessfox.procmem;
 
-import sh.adelessfox.procmem.process.Process;
-
 import java.nio.charset.Charset;
 
 /**
- * Represents an absolute address in a process.
+ * Represents an absolute address in a memory view.
  */
-public final class Pointer implements Comparable<Pointer> {
-    private final Process process;
-    private final Memory memory;
-    private final StableValue<Memory> resolvedMemory;
-    private final long address;
-
-    public Pointer(Process process, long address) {
-        this(process, address, StableValue.of());
-    }
-
-    private Pointer(Process process, long address, StableValue<Memory> resolvedMemory) {
-        this.process = process;
-        this.memory = null;
-        this.resolvedMemory = resolvedMemory;
-        this.address = address;
-    }
-
-    public Pointer(Memory memory, long address) {
-        this.process = memory.process;
-        this.memory = memory;
-        this.resolvedMemory = null;
-        this.address = address;
+public record Pointer(Memory memory, long address) {
+    public Pointer {
+        if (address < 0) {
+            throw new IllegalArgumentException("address must be non-negative");
+        }
     }
 
     public byte readByte() {
@@ -84,16 +65,7 @@ public final class Pointer implements Comparable<Pointer> {
     }
 
     public Pointer add(long byteOffset) {
-        long next = Math.addExact(address, byteOffset);
-        if (memory != null) {
-            return new Pointer(memory, next);
-        }
-        var cached = resolvedMemory.orElse(null);
-        if (cached != null && next >= cached.base() && next - cached.base() < cached.size()) {
-            // Reuse the resolution, but remain unbound so later arithmetic can leave this region
-            return new Pointer(process, next, resolvedMemory);
-        }
-        return new Pointer(process, next);
+        return new Pointer(memory, Math.addExact(address, byteOffset));
     }
 
     public boolean isNull() {
@@ -104,30 +76,12 @@ public final class Pointer implements Comparable<Pointer> {
         return address != 0;
     }
 
-    public long address() {
-        return address;
-    }
-
-    public Memory memory() {
-        if (memory != null) {
-            return memory;
-        }
-        return resolvedMemory.orElseSet(() -> process.region(address)
-            .orElseThrow(() -> new IllegalStateException("No committed region contains address %#x".formatted(address)))
-            .memory());
-    }
-
     public MemoryLayout layout() {
-        return memory != null ? memory.layout() : process.layout();
+        return memory.layout();
     }
 
     @Override
     public String toString() {
         return "%#x".formatted(address);
-    }
-
-    @Override
-    public int compareTo(Pointer o) {
-        return Long.compareUnsigned(address, o.address);
     }
 }

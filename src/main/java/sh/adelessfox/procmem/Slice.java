@@ -20,6 +20,12 @@ import java.util.stream.Stream;
  */
 @Debug.Renderer(childrenArray = "this.stream().toArray()", hasChildren = "this.length > 0")
 public record Slice<T>(Type.Sized<T> type, Pointer pointer, int length) implements Iterable<T> {
+    public Slice {
+        if (length < 0) {
+            throw new IllegalArgumentException("length must be non-negative");
+        }
+    }
+
     /**
      * Reads the element at the specified index in the slice.
      *
@@ -62,6 +68,10 @@ public record Slice<T>(Type.Sized<T> type, Pointer pointer, int length) implemen
     public Slice<T> subSlice(int start, int end) {
         Objects.checkFromToIndex(start, end, length);
         return new Slice<>(type, pointer.add(Math.multiplyExact(start, stride())), end - start);
+    }
+
+    public boolean isEmpty() {
+        return length == 0;
     }
 
     @Override
